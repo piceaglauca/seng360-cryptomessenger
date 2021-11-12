@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  kdc:
+    build: .
+    container_name: kdc
+    hostname: kdc
+    volumes:
+      - ./:/volumes
+    tty: true
+
+  alice:
+    build: .
+    container_name: alice
+    hostname: alice
+    volumes:
+      - ./:/volumes
+    tty: true
+
+  bob:
+    build: .
+    container_name: bob
+    hostname: bob
+    volumes:
+      - ./:/volumes
+    tty: true
