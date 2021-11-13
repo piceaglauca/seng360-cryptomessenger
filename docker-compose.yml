@@ -2,25 +2,25 @@ version: "3"
 
 services:
   kdc:
-    build: .
+    build:
+      context: .
+      target: kdc # use "kdc" image from Dockerfile.
     container_name: kdc
     hostname: kdc
-    volumes:
-      - ./:/volumes
-    tty: true
+    tty: true # equivalent: docker run -t
 
   alice:
-    build: .
+    build:
+      context: .
+      target: client
     container_name: alice
     hostname: alice
-    volumes:
-      - ./:/volumes
     tty: true
 
   bob:
-    build: .
+    build:
+      context: .
+      target: client
     container_name: bob
     hostname: bob
-    volumes:
-      - ./:/volumes
     tty: true
