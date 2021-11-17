@@ -6,25 +6,20 @@ import cryptography
 
 # Establish db connection. 
 # Db is initialized by client-db-init.py when container image is created.
-con = sqlite3.connect('client.db')
+con = sqlite3.connect('/var/lib/client.db')
 
 # Initialize db cursor.
 cur = con.cursor()
 
-# Populate example messages table.
+# Query db.
 cur.execute(
-    "INSERT INTO message VALUES"
-    "(1, 'message 1 body'),"
-    "(2, 'message 2 body'),"
-    "(3, 'message 3 body');"
+    "SELECT * FROM message;"
 )
 
 # Obtain and print rows:
 for row in cur.execute("SELECT * FROM message;"):
     print(row)
 
-# Save changes to db.
+# Save changes to db and close connection.
 con.commit()
-
-# Close db connection.
 con.close()
