@@ -25,12 +25,9 @@ class User:
     """
 
     def __init__(self, ipk=None, spk=None, opk=None):
-        if ipk is None:
-            self.ipk = IPK.generate(ipk)
-        if spk is None:
-            self.spk = SPK.generate(self.ipk, spk)
-        if opk is None:
-            self.opk = OPK.generate(opk)
+        self.ipk = IPK.generate(ipk)
+        self.spk = SPK.generate(self.ipk, spk)
+        self.opk = OPK.generate(opk)
 
 
 class KeyPair:
@@ -99,6 +96,9 @@ class KeyPair:
 
         return Ed25519PrivateKey.from_private_bytes(self.private_bytes())
 
+    def from_bytes(key):
+        return KeyPair(X25519PrivateKey.from_private_bytes(key))
+
 
 class IPK:
     """An identity x25519 pre-keypair.
@@ -120,8 +120,13 @@ class IPK:
 
         if isinstance(private_key, IPK):
             return IPK(private_key)
+        elif isinstance(private_key, bytes):
+            return IPK.from_bytes(private_key)
         else:
             return IPK(KeyPair.generate(private_key))
+
+    def from_bytes(key):
+        return IPK(KeyPair.from_bytes(key))
 
 
 class SPK:
@@ -164,8 +169,13 @@ class SPK:
 
         if isinstance(private_key, SPK):
             return SPK(ipk, private_key)
+        elif isinstance(private_key, bytes):
+            return SPK.from_bytes(ipk, private_key)
         else:
             return SPK(ipk, KeyPair.generate(private_key))
+
+    def from_bytes(ipk, key):
+        return SPK(ipk, KeyPair.from_bytes(key))
 
 
 class OPK:
@@ -174,8 +184,11 @@ class OPK:
     An OPK should be instantiated indirectly through the generate()
     function."""
 
-    def __init__(self):
-        self.keyPair = KeyPair.generate()
+    def __init__(self, private_key=None):
+        if isinstance(private_key, KeyPair):
+            self.keyPair = private_key
+        else:
+            self.keyPair = KeyPair.generate()
 
     def generate(private_key = None):
         """Generate a list of 100 x25519 one-time use pre-keypairs.
@@ -191,8 +204,13 @@ class OPK:
             for key in private_key:
                 if isinstance(key, OPK):
                     keyList.append(key)
+                elif isinstance(key, bytes):
+                    keyList.append(OPK.from_bytes(key))
 
         for i in range(100-len(keyList)):
             keyList.append(OPK())
 
         return keyList
+
+    def from_bytes(key):
+        return OPK(KeyPair.from_bytes(key))
