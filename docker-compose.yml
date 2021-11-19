@@ -2,25 +2,24 @@ version: "3"
 
 services:
   kdc:
-    build: .
+    build: ./kdc
     container_name: kdc
-    hostname: kdc
     volumes:
-      - ./:/volumes
+      - ./kdc/kdc:/code/kdc
     tty: true
 
   alice:
-    build: .
+    build: ./client
     container_name: alice
-    hostname: alice
     volumes:
-      - ./:/volumes
+      - ./client/client:/code/client
+      - ${LOG_DIR}:/var/log
     tty: true
 
   bob:
-    build: .
+    build: ./client
     container_name: bob
-    hostname: bob
     volumes:
-      - ./:/volumes
+      - ./client/client:/code/client
+      - ${LOG_DIR}:/var/log
     tty: true
