@@ -10,7 +10,7 @@ import sys
 
 # `logging` module has constants for each log level. Get them based on env var
 LOG_LEVEL = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper())
-LOG_FORMAT = "[%(asctime)s] %(module)s %(levelname)s: %(message)s"
+LOG_FORMAT = "[%(asctime)s] %(module)s:%(funcName)s %(levelname)s: %(message)s"
 
 logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
 LOGGER = logging.getLogger(__name__)
