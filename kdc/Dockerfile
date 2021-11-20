@@ -9,7 +9,7 @@ WORKDIR /code
 
 # Install deps
 COPY ./requirements.txt ./requirements.txt
-RUN pip install -r ./requirements.txt && pip install --upgrade pip
+RUN pip install --upgrade pip && pip install -r ./requirements.txt
 
 # Set up DB
 COPY ./scripts/kdc-db-init.py ./scripts/kdc-db-init.py
