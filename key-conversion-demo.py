@@ -67,33 +67,16 @@ bob_ik_pub_bytes = bob_ik.verify_key.encode()
 # Alice generates shared secret:
 
 # Alice converts her IK private to X25519.
-alice_ik_priv_ed = alice_ik.to_curve25519_private_key()
-alice_ik_priv_x = X25519PrivateKey.from_private_bytes(alice_ik_priv_ed._private_key)
+alice_ik_priv_x_nacl = alice_ik.to_curve25519_private_key()
+alice_ik_priv_x = X25519PrivateKey.from_private_bytes(alice_ik_priv_x_nacl._private_key)
 
 # Alice converts Bob's IK public to X25519
-bob_ik_pub_ed = bob_ik.verify_key.to_curve25519_public_key()
-bob_ik_pub_x = X25519PublicKey.from_public_bytes(bob_ik_pub_ed._public_key)
+bob_ik_pub_x_nacl = bob_ik.verify_key.to_curve25519_public_key()
+bob_ik_pub_x = X25519PublicKey.from_public_bytes(bob_ik_pub_x_nacl._public_key)
 
 # Alice generates shared secret using converted keys.
 alice_shared_secret = alice_ik_priv_x.exchange(bob_ik_pub_x)
 print('alice generated shared secret:')
 print(alice_shared_secret)
-
-# Bob generates shared secret:
-
-# Bob converts his IK private to X25519.
-bob_ik_priv_ed = bob_ik.to_curve25519_private_key()
-bob_ik_priv_x = X25519PrivateKey.from_private_bytes(bob_ik_priv_ed._private_key)
-
-# Bob converts Alice's IK public to X25519
-alice_ik_pub_ed = alice_ik.verify_key.to_curve25519_public_key()
-alice_ik_pub_x = X25519PublicKey.from_public_bytes(alice_ik_pub_ed._public_key)
-
-# Bob generates shared secret using converted keys.
-bob_shared_secret = bob_ik_priv_x.exchange(alice_ik_pub_x)
-print('bob generated shared secret:')
-print(bob_shared_secret)
-
-
 
 
