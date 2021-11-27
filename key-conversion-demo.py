@@ -71,7 +71,8 @@ alice_ik_priv_x_nacl = alice_ik.to_curve25519_private_key()
 alice_ik_priv_x = X25519PrivateKey.from_private_bytes(alice_ik_priv_x_nacl._private_key)
 
 # Alice converts Bob's IK public to X25519
-bob_ik_pub_x_nacl = bob_ik.verify_key.to_curve25519_public_key()
+bob_ik_pub = nacl.signing.VerifyKey(bob_ik_pub_bytes)
+bob_ik_pub_x_nacl = bob_ik_pub.to_curve25519_public_key()
 bob_ik_pub_x = X25519PublicKey.from_public_bytes(bob_ik_pub_x_nacl._public_key)
 
 # Alice generates shared secret using converted keys.
