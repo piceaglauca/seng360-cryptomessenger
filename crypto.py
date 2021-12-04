@@ -26,6 +26,11 @@ from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
 
+# Password-based encryption
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+import os # for nonces
+import getpass
+
 # Exceptions from invalid keys/signatures
 from cryptography.exceptions import *
 
@@ -132,6 +137,7 @@ class User:
         self.ipk = None
         self.spk = None
         self.opk = None
+        self.nonce = None
         self.ratchets = {}
 
     @staticmethod
@@ -145,8 +151,22 @@ class User:
         user.ipk = IPK.generate()
         user.spk = SPK.generate(user.ipk)
         user.opk = OPK.generateMany()
+
+        # Get password from user, and create cipher object for encrypting
+        # and decrypting at-rest data.
+        password = kdf(getpass.getpass('Enter a new password: ').encode())
+        if password == kdf(getpass.getpass('Confirm password: ').encode()):
+            user.nonce = os.urandom(32)
+            user.cipher = Cipher(algorithms.AES(kdf(user.nonce + password)),
+                                 modes.GCM(user.nonce))
+        else:
+            raise Exception('invalid password')
         
         return user
+
+    @staticmethod
+    def login(): # -> User
+        pass
 
     def register(self, server):
         """Register my key bundle with the server."""
@@ -641,8 +661,9 @@ class OPK(KeyPair):
 
 ## Testing/demo
 if __name__ == '__main__':
-    print('Creating two new users, alice and bob')
+    print('Creating user for Alice.')
     alice = User.new()
+    print('Creating user for Bob.')
     bob = User.new()
 
     print('Creating the server connection (just an object instantiation for now)')
