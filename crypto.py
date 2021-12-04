@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import *
 
 # Key translation to/from bytes
 from cryptography.hazmat.primitives import serialization
+import json
 
 # Key translation from ed25519 to x25519
 import nacl.signing
@@ -152,7 +153,7 @@ class User:
 
         self.id = server.register(KeyBundle.from_user(self).package())
 
-    def startHandshake(self, peer_keybundle: dict):
+    def startHandshake(self, peer_keybundle: str):
         """Calculate the shared secret from a users prekey bundle."""
 
         kb = KeyBundle.unpackage(peer_keybundle)
@@ -161,7 +162,7 @@ class User:
         if self.id is None:
             raise Exception('Register with Server first.')
 
-        self.ratchets[peer_keybundle['ID']] = DoubleRatchet(
+        self.ratchets[kb.id] = DoubleRatchet(
             my_id = self.id,
             peer_id = kb.id,
             associated_data = self.ipk.public_bytes() + kb.ipk.public_bytes(),
@@ -178,7 +179,7 @@ class User:
                 'epk': epk.public_bytes(), \
                 'opk': kb.opk.public_bytes()}
 
-    def finishHandshake(self, peer_keybundle: dict):
+    def finishHandshake(self, peer_keybundle: str):
         """Calculate the matching shared secret from a users prekey bundle."""
 
         peer_id = peer_keybundle['id']
@@ -289,28 +290,35 @@ class KeyBundle:
 
         self.ipk.verify(self.spk.signature, self.spk.public_bytes())
 
-    def package(self) -> dict:
-        """Convert prekey bundle to dictionary for transmission."""
+    def package(self) -> str:
+        """Convert prekey bundle to json for transmission."""
 
         # Most cases will only have a single OPK in the key bundle.
         if isinstance(self.opk, OPK):
-            packagedOPK = self.opk.public_bytes()
+            packagedOPK = self.opk.public_bytes().hex()
 
         # When registering with the server, there will be a list of OPKs
         elif isinstance(self.opk, list):
             packagedOPK = []
             for opk in self.opk:
-                packagedOPK.append(opk.public_bytes())
+                packagedOPK.append(opk.public_bytes().hex())
 
-        return {'ID'       : self.id, \
-                'IPK'      : self.ipk.public_bytes(), \
-                'SPK'      : self.spk.public_bytes(), \
-                'signature': self.spk.signature, \
+        pkg =  {'ID'       : self.id, \
+                'IPK'      : self.ipk.public_bytes().hex(), \
+                'SPK'      : self.spk.public_bytes().hex(), \
+                'signature': self.spk.signature.hex(), \
                 'OPK'      : packagedOPK}
 
+        return json.dumps(pkg)
+
     @staticmethod
-    def unpackage(bundle: dict): # -> KeyBundle, throws TypeError
-        """Create a KeyBundle object from keys packaged in a dictionary."""
+    def unpackage(bundle_json: str): # -> KeyBundle, throws TypeError
+        """Create a KeyBundle object from keys packaged in a json."""
+
+        bundle = json.loads(bundle_json)
+        bundle['IPK'] = bytes.fromhex(bundle['IPK'])
+        bundle['SPK'] = bytes.fromhex(bundle['SPK'])
+        bundle['signature'] = bytes.fromhex(bundle['signature'])
 
         if isinstance(bundle, dict) and \
                 'ID' in bundle.keys() and \
@@ -320,14 +328,14 @@ class KeyBundle:
                 'OPK' in bundle.keys():
 
             # Most cases will only have a single OPK in the key bundle.
-            if isinstance(bundle['OPK'], bytes):
-                unpackagedOPK = OPK.from_public_bytes(bundle['OPK'])
+            if isinstance(bundle['OPK'], str):
+                unpackagedOPK = OPK.from_public_bytes(bytes.fromhex(bundle['OPK']))
 
             # When registering with the server, there will be a list of OPKs
             elif isinstance(bundle['OPK'], list):
                 unpackagedOPK = []
                 for opk in bundle['OPK']:
-                    unpackagedOPK.append(OPK.from_public_bytes(opk))
+                    unpackagedOPK.append(OPK.from_public_bytes(bytes.fromhex(opk)))
 
             return KeyBundle.from_keys(\
                         bundle['ID'], \
