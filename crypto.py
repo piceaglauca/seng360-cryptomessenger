@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import *
+import nacl.signing
 
 
 class Server:
@@ -35,7 +36,6 @@ class Server:
         if user_id in self.users.keys():
             kb = KeyBundle()
             kb.peer_id = self.users[user_id].peer_id
-            kb.edpk = self.users[user_id].edpk
             kb.ipk = self.users[user_id].ipk
             kb.spk = self.users[user_id].spk
             kb.opk = self.users[user_id].opk.pop(0) # forget the sent OPK
@@ -52,7 +52,6 @@ class User:
     be generated fresh.
 
     Important attributes:
-    edpk -- the ed25519 prekey, type EDPK
     ipk -- the identity prekey, type IPK
     spk -- the signed prekey, type SPK
     opk -- the one-time use prekey, type list of OPK
@@ -60,7 +59,6 @@ class User:
 
     def __init__(self):
         self.id = None # received from server when key bundle is registered
-        self.edpk = None
         self.ipk = None
         self.spk = None
         self.opk = None
@@ -74,9 +72,8 @@ class User:
         by the server when the keybundle is registered."""
 
         user = User()
-        user.edpk = EDPK.generate()
         user.ipk = IPK.generate()
-        user.spk = SPK.generate(user.edpk)
+        user.spk = SPK.generate(user.ipk)
         user.opk = OPK.generateMany()
         
         return user
@@ -135,7 +132,7 @@ class User:
         """Derive the shared secret from keys."""
 
         # Initial diffie hellman
-        if isinstance(ipk.private, X25519PrivateKey):
+        if isinstance(ipk.private, Ed25519PrivateKey):
             DH1 = ipk.exchange(keybundle.spk)
             DH2 = epk.exchange(keybundle.ipk)
             DH3 = epk.exchange(keybundle.spk)
@@ -147,6 +144,7 @@ class User:
             for opk in self.opk:
                 if opk.public_bytes() == keybundle.opk.public_bytes():
                     matchingOPK = opk
+                    break
             if matchingOPK is None:
                 raise Exception # couldn't find matching OPK
 
@@ -169,7 +167,6 @@ class KeyBundle:
 
     def __init__(self):
         self.peer_id = None
-        self.edpk = None
         self.ipk = None
         self.spk = None
         self.opk = None
@@ -177,7 +174,7 @@ class KeyBundle:
     def validateSignature(self) -> None:
         """Validate the signed SPK."""
 
-        self.edpk.verify(self.spk.signature, self.spk.public_bytes())
+        self.ipk.verify(self.spk.signature, self.spk.public_bytes())
 
     def package(self) -> dict:
         """Convert prekey bundle to dictionary for transmission."""
@@ -193,7 +190,6 @@ class KeyBundle:
                 packagedOPK.append(opk.public_bytes())
 
         return {'ID'       : self.peer_id, \
-                'EDPK'     : self.edpk.public_bytes(), \
                 'IPK'      : self.ipk.public_bytes(), \
                 'SPK'      : self.spk.public_bytes(), \
                 'signature': self.spk.signature, \
@@ -205,7 +201,6 @@ class KeyBundle:
 
         if isinstance(bundle, dict) and \
                 'ID' in bundle.keys() and \
-                'EDPK' in bundle.keys() and \
                 'IPK' in bundle.keys() and \
                 'SPK' in bundle.keys() and \
                 'signature' in bundle.keys() and \
@@ -223,24 +218,22 @@ class KeyBundle:
 
             return KeyBundle.from_keys(\
                         bundle['ID'], \
-                        EDPK.from_public_bytes(bundle['EDPK']), \
                         IPK.from_public_bytes(bundle['IPK']), \
                         SPK.from_public_bytes(bundle['SPK'], \
                                               bundle['signature']), \
                         unpackagedOPK)
 
         elif isinstance(bundle, dict):
-            raise TypeError(f"Invalid key bundle. Expected keys: ['ID','EDPK','IPK','SPK','signature','OPK']. Got: {bundle.keys()}")
+            raise TypeError(f"Invalid key bundle. Expected keys: ['ID','IPK','SPK','signature','OPK']. Got: {bundle.keys()}")
         else:
             raise TypeError(f'invalid key bundle. Expected dictionary, got {type(bundle)}')
 
     @staticmethod
-    def from_keys(peer_id: int, edpk, ipk, spk, opk): # -> KeyBundle
+    def from_keys(peer_id: int, ipk, spk, opk): # -> KeyBundle
         """Generate a KeyBundle from key objects."""
 
         kb = KeyBundle()
         kb.peer_id = peer_id
-        kb.edpk = edpk
         kb.ipk = ipk
         kb.spk = spk
         kb.opk = opk
@@ -255,7 +248,6 @@ class KeyBundle:
 
         kb = KeyBundle()
         kb.peer_id = user.id
-        kb.edpk = user.edpk
         kb.ipk = user.ipk
         kb.spk = user.spk
         kb.opk = user.opk
@@ -291,7 +283,12 @@ class KeyPair:
     def exchange(self, public_key) -> bytes:
         """Perform a Diffie-Hellman derivation."""
 
-        return self.private.exchange(public_key.public)
+        if isinstance(public_key, IPK):
+            peer_public_key = public_key.to_x25519_public()
+        else:
+            peer_public_key = public_key.public
+
+        return self.private.exchange(peer_public_key)
 
     def public_bytes(self, \
                     encoding = serialization.Encoding.Raw, \
@@ -358,11 +355,11 @@ class KeyPair:
         return kp
 
 
-class EDPK(KeyPair):
+class IPK(KeyPair):
     """An ed25519 pre-keypair.
 
-    An EDPK should be instantiated indirectly through the generate() 
-    function, or derived from bytes using from_public_bytes() or 
+    An IPK should be instantiated indirectly through the generate()
+    function, or derived from bytes using from_public_bytes() or
     from_private_bytes()."""
 
     def sign(self, message: bytes) -> bytes:
@@ -373,57 +370,44 @@ class EDPK(KeyPair):
     def verify(self, signature: bytes, message: bytes) -> None:
         """Verify the validity of a signed message."""
 
-        # Ed25519.verify() does not return a value. Instead, it throws 
-        # InvalidSignature if the signature cannot be verified.
+        # Ed25519.verify() does not return a value. Instead, it throws
+        # InvalidSignature if the signature is invalid.
         try:
             self.public.verify(signature, message)
         except InvalidSignature:
             raise # TODO: should we handle the invalid signature somehow?
 
-    @staticmethod
-    def generate(): # -> EDPK
-        """Generate an ed25519 pre-keypair."""
+    def exchange(self, public_key) -> bytes:
+        """Perform a Diffie-Hellman derivation."""
 
-        edpk = EDPK()
-        edpk.private = Ed25519PrivateKey.generate()
-        edpk.public = edpk.private.public_key()
+        return self.to_x25519_private().exchange(public_key.public)
 
-        return edpk
+    def to_x25519_private(self) -> X25519PrivateKey:
+        """Convert the ed25519 private key to a birationally equivalent
+        x25519 key.
 
-    @staticmethod
-    def from_public_bytes(public_bytes: bytes): # -> EDPK
-        """Create an EDPK object from public key bytes representation."""
+        Credit to Spencer Davis."""
 
-        edpk = EDPK()
-        kp = KeyPair.from_public_bytes(public_bytes, 'ed25519')
-        edpk.public = kp.public
+        ed_private_pynacl = nacl.signing.SigningKey(self.private_bytes())
+        x_private_pynacl = ed_private_pynacl.to_curve25519_private_key()
+        return X25519PrivateKey.from_private_bytes(x_private_pynacl.encode())
 
-        return edpk
+    def to_x25519_public(self) -> X25519PublicKey:
+        """Convert the ed25519 public key to a birationally equivalent
+        x25519 key.
 
-    @staticmethod
-    def from_private_bytes(private_bytes: bytes): # -> EDPK
-        """Create an EDPK object from private key bytes representation."""
+        Credit to Spencer Davis."""
 
-        edpk = EDPK()
-        kp = KeyPair.from_private_bytes(private_bytes, 'ed25519')
-        edpk.private, edpk.public = kp.private, kp.public
-
-        return edpk
-
-
-class IPK(KeyPair):
-    """An x25519 pre-keypair.
-
-    An IPK should be instantiated indirectly through the generate() 
-    function, or derived from bytes using from_public_bytes() or 
-    from_private_bytes()."""
+        ed_public_pynacl = nacl.signing.VerifyKey(self.public_bytes())
+        x_public_pynacl = ed_public_pynacl.to_curve25519_public_key()
+        return X25519PublicKey.from_public_bytes(x_public_pynacl.encode())
 
     @staticmethod
     def generate(): # -> IPK
-        """Generate an x25519 pre-keypair."""
+        """Generate an ed25519 pre-keypair."""
 
         ipk = IPK()
-        ipk.private = X25519PrivateKey.generate()
+        ipk.private = Ed25519PrivateKey.generate()
         ipk.public = ipk.private.public_key()
 
         return ipk
@@ -433,7 +417,7 @@ class IPK(KeyPair):
         """Create an IPK object from public key bytes representation."""
 
         ipk = IPK()
-        kp = KeyPair.from_public_bytes(public_bytes)
+        kp = KeyPair.from_public_bytes(public_bytes, 'ed25519')
         ipk.public = kp.public
 
         return ipk
@@ -443,7 +427,7 @@ class IPK(KeyPair):
         """Create an IPK object from private key bytes representation."""
 
         ipk = IPK()
-        kp = KeyPair.from_private_bytes(private_bytes)
+        kp = KeyPair.from_private_bytes(private_bytes, 'ed25519')
         ipk.private, ipk.public = kp.private, kp.public
 
         return ipk
