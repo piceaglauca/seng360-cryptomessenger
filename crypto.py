@@ -27,7 +27,6 @@ from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
 
 # Password-based encryption
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 import os # for nonces
 import getpass
 
