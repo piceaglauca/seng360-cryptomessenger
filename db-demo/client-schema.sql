@@ -7,6 +7,6 @@ CREATE TABLE message(
     id PRIMARY KEY,
     conversation_id,
     body,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp,
     FOREIGN KEY (conversation_id) REFERENCES conversation(id)
 );
