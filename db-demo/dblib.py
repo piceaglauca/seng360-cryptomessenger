@@ -107,21 +107,27 @@ class KDCDBCursor:
         return self.cur.fetchall()
 
     def getKeyBundle(self, username):
+        if username not in self.getUsers():
+            return None
+
         # Get key bundle from db (contains all OPKs).
         self.cur.execute(
             'SELECT * FROM registry WHERE username = ?', [username]
         )
-        key_bundle = KeyBundle.unpackage(self.cur.fetchall()[0][1])
+        #key_bundle = KeyBundle.unpackage(self.cur.fetchall()[0][1])
+        key_bundle = self.cur.fetchall()[0][1]
+        return key_bundle
         
         # Consume one OPK.
-        key_bundle_one_opk = key_bundle.consumeOPK()
+        #key_bundle_one_opk = key_bundle.consumeOPK()
 
+    def updateKeyBundle(self, username, key_bundle):
         # Put key bundle back in db.
         self.cur.execute(
-            'UPDATE registry SET key_bundle = ? WHERE  username = ?', (KeyBundle.package(key_bundle), username)
+            'UPDATE registry SET key_bundle = ? WHERE  username = ?', (key_bundle, username)
         )
         self.con.commit()
-        return KeyBundle.package(key_bundle_one_opk)
+        #return KeyBundle.package(key_bundle_one_opk)
 
 
 
