@@ -290,6 +290,7 @@ class KeyBundle:
                 packagedOPK.append(opk.public_bytes().hex())
 
         pkg =  {'ID'       : self.id, \
+                'username' : self.username, \
                 'IPK'      : self.ipk.public_bytes().hex(), \
                 'SPK'      : self.spk.public_bytes().hex(), \
                 'signature': self.spk.signature.hex(), \
@@ -308,6 +309,7 @@ class KeyBundle:
 
         if isinstance(bundle, dict) and \
                 'ID' in bundle.keys() and \
+                'username' in bundle.keys() and \
                 'IPK' in bundle.keys() and \
                 'SPK' in bundle.keys() and \
                 'signature' in bundle.keys() and \
@@ -325,6 +327,7 @@ class KeyBundle:
 
             return KeyBundle.from_keys(\
                         bundle['ID'], \
+                        bundle['username'], \
                         IPK.from_public_bytes(bundle['IPK']), \
                         SPK.from_public_bytes(bundle['SPK'], \
                                               bundle['signature']), \
@@ -336,11 +339,12 @@ class KeyBundle:
             raise TypeError(f'invalid key bundle. Expected dictionary, got {type(bundle)}')
 
     @staticmethod
-    def from_keys(id: int, ipk, spk, opk): # -> KeyBundle
+    def from_keys(id: int, username, ipk, spk, opk): # -> KeyBundle
         """Generate a KeyBundle from key objects."""
 
         kb = KeyBundle()
         kb.id = id
+        kb.username = username
         kb.ipk = ipk
         kb.spk = spk
         kb.opk = opk

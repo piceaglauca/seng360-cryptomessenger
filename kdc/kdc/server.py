@@ -3,15 +3,16 @@ import os
 from crypto import KeyBundle
 from dblib import KDCDBCursor
 
+DB_DIR = '../data'
+DB_PATH = f'{DB_DIR}/kdc.db'
+SCRIPT_DIR = '../scripts'
+
+
 class Server:
     """Key Distribution Center.
 
     Stores key bundles of users, and provides them to users looking to begin
     a secret conversation with a user."""
-
-    DB_DIR = '../data'
-    DB_PATH = f'{DB_DIR}/kdc.db'
-    SCRIPT_DIR = '../scripts'
 
     def __init__(self):
         if not os.path.exists(DB_PATH):
@@ -24,7 +25,7 @@ class Server:
         Returns a user ID."""
 
         kb = KeyBundle.unpackage(keybundle)
-        uuid = self.kdc_db.addUser(kb.username, kb)
+        uuid = self.kdc_db.addUser(kb.username, kb.package())
 
         return uuid
 
@@ -46,4 +47,4 @@ class Server:
         # Write the keybundle back to the db, without the sent OPK
         self.kdc_db.updateKeyBundle(username, full_kb.package())
 
-        return kb_for_user
+        return kb_for_user.package()

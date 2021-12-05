@@ -35,7 +35,7 @@ class KDCDBCursor:
             'SELECT username FROM registry'
         )
         self.con.commit()
-        return self.cur.fetchall()
+        return [result[0] for result in self.cur.fetchall()]
 
     def getKeyBundle(self, username):
         if username not in self.getUsers():
