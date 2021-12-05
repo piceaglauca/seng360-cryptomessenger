@@ -5,7 +5,7 @@
 To build and start containers:
 
 ```
-LOG_DIR=<log-dir> docker-compose build
+docker-compose build
 LOG_DIR=<log-dir> docker-compose up
 ```
 
