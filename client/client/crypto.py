@@ -95,9 +95,9 @@ class User:
     opk -- the one-time use prekey, type list of OPK
     """
 
-    def __init__(self, username):
+    def __init__(self):
         self.id = None # received from server when key bundle is registered
-        self.username = username
+        self.username = None
         self.ipk = None
         self.spk = None
         self.opk = None
@@ -105,13 +105,14 @@ class User:
         self.ratchets = {}
 
     @staticmethod
-    def new(): # -> User
+    def new(username): # -> User
         """Create a new user with prekeys.
 
         Note: the User ID is not created at this stage, as it will be provided
         by the server when the keybundle is registered."""
 
         user = User()
+        user.username = username
         user.ipk = IPK.generate()
         user.spk = SPK.generate(user.ipk)
         user.opk = OPK.generateMany()
