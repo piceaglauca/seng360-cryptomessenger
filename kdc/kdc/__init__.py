@@ -17,23 +17,28 @@ LOGGER = logging.getLogger(__name__)
 APP = FastAPI()
 
 # For storing connected users
-USERS = set()
+USERS = {}
 
 
-@APP.websocket("/{username}")
-async def chat(user: WebSocket, username: str):
+@APP.websocket("/{me}/{friend}")
+async def chat(connection: WebSocket, me: str, friend: str):
     """WebSocket endpoint for handling chat messages"""
 
     # Wait for user to accept connection
-    await user.accept()
+    await connection.accept()
+    
     # Add user to set of connected users
-    USERS.add(user)
+    USERS[me] = connection
+
+    if friend in USERS:
+        await USERS[friend].send_text(f"INFO: {me} has joined the chat.")
+
+    else:
+        await USERS[me].send_text(f"INFO: {friend} not yet online.")
 
     while True:
         # Wait for a message from this user
-        message = await user.receive_text()
+        message = await USERS[me].receive_text()
 
-        # Once received, for every connected user (as `recipient`)...
-        for recipient in USERS:
-            # Send a JSON string of tuple of sender and received message..
-            await recipient.send_json((username, message))
+        # Send a JSON string of tuple of sender and received message..
+        await USERS[friend].send_text(f"{me}: {message}")

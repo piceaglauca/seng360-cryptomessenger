@@ -27,7 +27,8 @@ URL = "ws://kdc:8000"
 def main():
     # DEBUG:
     username = login()
-    asyncio.run(chat(username))
+    friend = input("Who do you want to talk to? ")
+    asyncio.run(chat(username, friend))
     
     return 0
 
@@ -80,14 +81,14 @@ def login():
             sys.exit(0)
 
 
-async def chat(username: str) -> None:
+async def chat(username: str, friend: str) -> None:
     """Connects to server and starts the chat
     
     Connects via WebSocket, loops forever.
     """
 
-    async with websockets.connect(f"{URL}/{username}") as server:
-        print(f"Connected as '{username}'.")
+    async with websockets.connect(f"{URL}/{username}/{friend}") as server:
+        print(f"Connected as '{username}'. Chatting to {friend}")
         
         # Set up task for listening to server for incoming messages
         server_task = asyncio.ensure_future(
@@ -111,11 +112,8 @@ async def server_handler(server) -> None:
     """Handles incoming messages from server"""
 
     # For each new message received from server
-    async for data in server:
-        # Parse data
-        username, message = json.loads(data)
-        # Display to terminal
-        print(f"{username}: {message}")
+    async for message in server:
+        print(message)
 
 
 async def input_handler(server) -> None:
