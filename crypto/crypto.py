@@ -126,12 +126,62 @@ class User:
                                  modes.GCM(user.nonce))
         else:
             raise Exception('invalid password')
+
+        user.writeKeyBundle()
         
         return user
 
     @staticmethod
-    def login(): # -> User
-        pass
+    def login(username: str): # -> User
+        """Login an existing user.
+
+        The encrypted keys will be in a file called .cryptomessenger-Alice"""
+
+        filename = f'.cryptomessenger-{username}'
+
+        # Username is verified by checking the existance of the key file
+        password = kdf(getpass.getpass('Enter your password: ').encode())
+        if not os.path.exists(filename) \
+                or password != kdf(getpass.getpass('Confirm password: ').encode()):
+            raise Exception('Login error')
+
+        with open(filename, 'rb') as f:
+            # File begins with 16-bytes for tag, 32-bytes for nonce
+            tag = f.read(16)
+            nonce = f.read(32)
+            enc_kb = f.read()
+
+        try:
+            cipher = Cipher(algorithms.AES(kdf(nonce + password)),
+                            modes.GCM(nonce))
+            decryptor = cipher.decryptor()
+            dec_kb = decryptor.update(enc_kb) + decryptor.finalize_with_tag(tag)
+        except InvalidTag:
+            raise Exception('Login error: invalid tag') # TODO remove reason
+
+        # Login success - return a new User object
+        kb = KeyBundle.unpackage(dec_kb)
+        user = User()
+        user.username = kb.username
+        user.id = kb.id
+        user.ipk = kb.ipk
+        user.spk = kb.spk
+        user.opk = kb.opk
+
+        return user
+
+    def writeKeyBundle(self):
+        """Write key bundle to encrypted file."""
+
+        kb = KeyBundle.from_user(self).package().encode()
+        encryptor = self.cipher.encryptor()
+        enc_kb = encryptor.update(kb) + encryptor.finalize()
+        try:
+            with open(f'.cryptomessenger-{self.username}', 'wb') as f:
+                # File will begin with 16-bytes for tag, 32-bytes for nonce
+                f.write(encryptor.tag + self.nonce + enc_kb)
+        except:
+            raise
 
     def register(self, server):
         """Register my key bundle with the server."""
