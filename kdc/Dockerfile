@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     python3.9 \
     python3-pip
 
-WORKDIR /code
+WORKDIR /code/kdc
 
 # Install deps
 COPY ./requirements.txt ./requirements.txt
@@ -21,5 +21,4 @@ RUN python3 ./scripts/kdc-db-init.py ./data/kdc-schema.sql
 
 ENV LOG_LEVEL "DEBUG"
 
-# Start server
-CMD ["uvicorn", "kdc:APP", "--host", "kdc", "--port", "8000"]
+CMD ["sh", "./scripts/startup.sh"]

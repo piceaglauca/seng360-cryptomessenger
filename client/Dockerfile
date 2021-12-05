@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     python3.9 \
     python3-pip
 
-WORKDIR /code
+WORKDIR /code/client
 
 # Install deps
 COPY ./requirements.txt ./requirements.txt
@@ -20,3 +20,5 @@ COPY ./data/client-schema.sql ./data/client-schema.sql
 RUN python3 ./scripts/client-db-init.py ./data/client-schema.sql
 
 ENV LOG_LEVEL "DEBUG"
+
+CMD ["sh", "./scripts/startup.sh"]

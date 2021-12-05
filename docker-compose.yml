@@ -5,14 +5,16 @@ services:
     build: ./kdc
     container_name: kdc
     volumes:
-      - ./kdc/kdc:/code/kdc
+      - ./kdc:/code/kdc
+      - ./crypto:/code/crypto
     tty: true
 
   alice:
     build: ./client
     container_name: alice
     volumes:
-      - ./client/client:/code/client
+      - ./client:/code/client
+      - ./crypto:/code/crypto
       - ${LOG_DIR}:/var/log
     tty: true
 
@@ -20,6 +22,7 @@ services:
     build: ./client
     container_name: bob
     volumes:
-      - ./client/client:/code/client
+      - ./client:/code/client
+      - ./crypto:/code/crypto
       - ${LOG_DIR}:/var/log
     tty: true
