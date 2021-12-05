@@ -83,42 +83,6 @@ def kdf(key):
     return kdf.derive(key)
 
 
-class Server:
-    """Key Distribution Center.
-
-    Stores key bundles of users, and provides them to users looking to begin
-    a secret conversation with a user."""
-
-    def __init__(self):
-        self.users = {}
-        self.nextUserID = 0
-
-    def register(self, keybundle: dict) -> int:
-        """Register a key bundle with the server.
-
-        Returns a user ID."""
-
-        kb = KeyBundle.unpackage(keybundle)
-        kb.id = self.nextUserID
-        self.users[self.nextUserID] = kb
-        self.nextUserID += 1
-        return self.nextUserID - 1
-
-    def getKeyBundle(self, user_id: int): # -> KeyBundle
-        """Get a key bundle to initiate X3DH protocol."""
-
-        if user_id in self.users.keys():
-            kb = KeyBundle()
-            kb.id = self.users[user_id].id
-            kb.ipk = self.users[user_id].ipk
-            kb.spk = self.users[user_id].spk
-            kb.opk = self.users[user_id].opk.pop(0) # forget the sent OPK
-
-            return kb # TODO: should return a JSON or something
-        else:
-            return None # TODO: handle a 'user not found' error
-
-
 class User:
     """A User of the cryptomessenger.
 
@@ -131,8 +95,9 @@ class User:
     opk -- the one-time use prekey, type list of OPK
     """
 
-    def __init__(self):
+    def __init__(self, username):
         self.id = None # received from server when key bundle is registered
+        self.username = username
         self.ipk = None
         self.spk = None
         self.opk = None
@@ -300,6 +265,7 @@ class KeyBundle:
 
     def __init__(self):
         self.id = None
+        self.username = None
         self.ipk = None
         self.spk = None
         self.opk = None
@@ -388,6 +354,7 @@ class KeyBundle:
 
         kb = KeyBundle()
         kb.id = user.id
+        kb.username = user.username
         kb.ipk = user.ipk
         kb.spk = user.spk
         kb.opk = user.opk
@@ -661,9 +628,9 @@ class OPK(KeyPair):
 ## Testing/demo
 if __name__ == '__main__':
     print('Creating user for Alice.')
-    alice = User.new()
+    alice = User.new('Alice')
     print('Creating user for Bob.')
-    bob = User.new()
+    bob = User.new('Bob')
 
     print('Creating the server connection (just an object instantiation for now)')
     server = Server()
