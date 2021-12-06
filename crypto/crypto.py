@@ -126,8 +126,6 @@ class User:
                                  modes.GCM(user.nonce))
         else:
             raise Exception('invalid password')
-
-        user.writeKeyBundle()
         
         return user
 
@@ -139,17 +137,17 @@ class User:
 
         filename = f'.cryptomessenger-{username}'
 
-        # Username is verified by checking the existance of the key file
-        password = kdf(getpass.getpass('Enter your password: ').encode())
-        if not os.path.exists(filename) \
-                or password != kdf(getpass.getpass('Confirm password: ').encode()):
-            raise Exception('Login error')
-
         with open(filename, 'rb') as f:
             # File begins with 16-bytes for tag, 32-bytes for nonce
             tag = f.read(16)
             nonce = f.read(32)
             enc_kb = f.read()
+
+        # Username is verified by checking the existance of the key file
+        password = kdf(getpass.getpass('Enter your password: ').encode())
+        if not os.path.exists(filename):
+            raise Exception('Login error')
+
 
         try:
             cipher = Cipher(algorithms.AES(kdf(nonce + password)),
@@ -187,6 +185,7 @@ class User:
         """Register my key bundle with the server."""
 
         self.id = server.register(KeyBundle.from_user(self).package())
+        self.writeKeyBundle()
 
     def startHandshake(self, peer_keybundle: str):
         """Calculate the shared secret from a users prekey bundle."""
