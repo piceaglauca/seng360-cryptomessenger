@@ -160,10 +160,13 @@ class User:
         # Login success - return a new User object
         kb = json.loads(dec_kb)
         user = User()
+        user.cipher = cipher
+        user.nonce = nonce
         user.username = kb['username']
         user.id = kb['ID']
         user.ipk = IPK.from_private_bytes(bytes.fromhex(kb['IPK']))
-        user.spk = SPK.from_private_bytes(bytes.fromhex(kb['SPK']), kb['signature'])
+        user.spk = SPK.from_private_bytes(bytes.fromhex(kb['SPK']),
+                                          bytes.fromhex(kb['signature']))
 
         # Unpackage OPKs
         user.opk = []
@@ -171,16 +174,18 @@ class User:
             user.opk.append(OPK.from_private_bytes(bytes.fromhex(opk)))
 
         # Unpackage ratchet states
-        for user, r in kb['ratchets']:
-            user.ratchets[user] = DoubleRatchet(r['root'],
-                                                r['my_id'],
-                                                r['peer_id'],
-                                                r['AD'])
+        for peer, r in kb['ratchets'].items():
+            # DoubleRatchet won't be initialized properly to begin with.
+            # Root key will be reset below
+            user.ratchets[peer] = DoubleRatchet(bytes.fromhex(r['root']),
+                                                r['myname'],
+                                                r['peername'],
+                                                bytes.fromhex(r['AD']))
             # Instantiating a DoubleRatchet sets the send and recv key.
             # Reset to previous values to ensure they match with peer.
-            user.ratchets[user].root_key = r['root']
-            user.ratchets[user].send_key = r['send']
-            user.ratchets[user].recv_key = r['recv']
+            user.ratchets[peer].root_key = bytes.fromhex(r['root'])
+            user.ratchets[peer].send_key = bytes.fromhex(r['send'])
+            user.ratchets[peer].recv_key = bytes.fromhex(r['recv'])
 
         return user
 
@@ -203,12 +208,12 @@ class User:
         # Package ratchet states
         ratchetBundle = {}
         for user in self.ratchets.keys():
-            ratchetBundle[user] = {'root'   : self.ratchets[user].root_key,
-                                   'send'   : self.ratchets[user].send_key,
-                                   'recv'   : self.ratchets[user].recv_key,
-                                   'AD'     : self.ratchets[user].associated_data,
-                                   'my_id'  : self.ratchets[user].my_id,
-                                   'peer_id': self.ratchets[user].peer_id}
+            ratchetBundle[user] = {'root'    : self.ratchets[user].root_key.hex(),
+                                   'send'    : self.ratchets[user].send_key.hex(),
+                                   'recv'    : self.ratchets[user].recv_key.hex(),
+                                   'AD'      : self.ratchets[user].associated_data.hex(),
+                                   'myname'  : self.ratchets[user].myname,
+                                   'peername': self.ratchets[user].peername}
         kb['ratchets'] = ratchetBundle
 
         kb_json = json.dumps(kb).encode()
@@ -236,9 +241,9 @@ class User:
         if self.id is None:
             raise Exception('Register with Server first.')
 
-        self.ratchets[kb.id] = DoubleRatchet(
-            my_id = self.id,
-            peer_id = kb.id,
+        self.ratchets[kb.username] = DoubleRatchet(
+            myname = self.username,
+            peername = kb.username,
             associated_data = self.ipk.public_bytes() + kb.ipk.public_bytes(),
             root_key = diffieHellman(
                 ipk_private = self.ipk,
@@ -248,15 +253,15 @@ class User:
                 opk_public = kb.opk))
         epk.private = None
 
-        return {'id': self.id, \
-                'ipk': self.ipk.public_bytes(), \
-                'epk': epk.public_bytes(), \
-                'opk': kb.opk.public_bytes()}
+        return {'username': self.username, \
+                'ipk'     : self.ipk.public_bytes(), \
+                'epk'     : epk.public_bytes(), \
+                'opk'     : kb.opk.public_bytes()}
 
     def finishHandshake(self, peer_keybundle: str):
         """Calculate the matching shared secret from a users prekey bundle."""
 
-        peer_id = peer_keybundle['id']
+        peername = peer_keybundle['username']
         peer_ipk = IPK.from_public_bytes(peer_keybundle['ipk'])
         peer_epk = KeyPair.from_public_bytes(peer_keybundle['epk'])
         used_opk = OPK.from_public_bytes(peer_keybundle['opk'])
@@ -267,9 +272,9 @@ class User:
                 opk = self.opk.pop(i)
                 break
 
-        self.ratchets[peer_id] = DoubleRatchet(
-            my_id = self.id,
-            peer_id = peer_id,
+        self.ratchets[peername] = DoubleRatchet(
+            myname = self.username,
+            peername = peername,
             associated_data = peer_ipk.public_bytes() + self.ipk.public_bytes(),
             root_key = diffieHellman(
                 ipk_public = peer_ipk,
@@ -278,18 +283,18 @@ class User:
                 spk_private = self.spk,
                 opk_private = opk))
 
-    def encrypt(self, peer_id, plaintext):
+    def encrypt(self, peername, plaintext):
         """Encrypt a message with the ratchet associated with peer."""
 
-        ciphertext = self.ratchets[peer_id].encrypt(plaintext)
+        ciphertext = self.ratchets[peername].encrypt(plaintext)
         self.writeKeyBundle() # record new state of ratchets
 
         return ciphertext
 
-    def decrypt(self, peer_id, ciphertext):
+    def decrypt(self, peername, ciphertext):
         """Decrypt a message with the ratchet associated with peer."""
 
-        plaintext = self.ratchets[peer_id].decrypt(ciphertext)
+        plaintext = self.ratchets[peername].decrypt(ciphertext)
         self.writeKeyBundle() # record new state of ratchets
 
         return plaintext
@@ -304,10 +309,10 @@ class DoubleRatchet:
     be turned everytime a message is encrypted or decrypted. Periodically,
     they will be reset by ratching the root key."""
 
-    def __init__(self, root_key, my_id, peer_id, associated_data):
+    def __init__(self, root_key, myname, peername, associated_data):
         self.root_key = kdf(root_key)
-        self.my_id = my_id
-        self.peer_id = peer_id
+        self.myname = myname
+        self.peername = peername
         self.associated_data = associated_data
         self.recv_key = self.root_key
         self.send_key = self.root_key
@@ -330,7 +335,7 @@ class DoubleRatchet:
     def updateEncryptor(self):
         """Refresh the encryptor with the ratcheted send key."""
 
-        self.send_key = kdf(self.send_key + str(self.my_id).encode())
+        self.send_key = kdf(self.send_key + str(self.myname).encode())
         self.encryptor = Cipher(
             algorithms.AES(self.send_key),
             modes.GCM(self.associated_data) # IV
@@ -340,7 +345,7 @@ class DoubleRatchet:
     def updateDecryptor(self):
         """Refresh the decryptor with the ratcheted receive key."""
 
-        self.recv_key = kdf(self.recv_key + str(self.peer_id).encode())
+        self.recv_key = kdf(self.recv_key + str(self.peername).encode())
         self.decryptor = Cipher(
             algorithms.AES(self.recv_key),
             modes.GCM(self.associated_data) # IV
