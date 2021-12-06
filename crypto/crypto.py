@@ -236,8 +236,6 @@ class User:
         if self.id is None:
             raise Exception('Register with Server first.')
 
-        import code
-        code.interact(local=locals())
         self.ratchets[kb.id] = DoubleRatchet(
             my_id = self.id,
             peer_id = kb.id,
