@@ -158,22 +158,62 @@ class User:
             raise Exception('Login error: invalid tag') # TODO remove reason
 
         # Login success - return a new User object
-        kb = KeyBundle.unpackage(dec_kb)
+        kb = json.loads(dec_kb)
         user = User()
-        user.username = kb.username
-        user.id = kb.id
-        user.ipk = kb.ipk
-        user.spk = kb.spk
-        user.opk = kb.opk
+        user.username = kb['username']
+        user.id = kb['ID']
+        user.ipk = IPK.from_private_bytes(bytes.fromhex(kb['IPK']))
+        user.spk = SPK.from_private_bytes(bytes.fromhex(kb['SPK']), kb['signature'])
+
+        # Unpackage OPKs
+        user.opk = []
+        for opk in kb['OPK']:
+            user.opk.append(OPK.from_private_bytes(bytes.fromhex(opk)))
+
+        # Unpackage ratchet states
+        for user, r in kb['ratchets']:
+            user.ratchets[user] = DoubleRatchet(r['root'],
+                                                r['my_id'],
+                                                r['peer_id'],
+                                                r['AD'])
+            # Instantiating a DoubleRatchet sets the send and recv key.
+            # Reset to previous values to ensure they match with peer.
+            user.ratchets[user].root_key = r['root']
+            user.ratchets[user].send_key = r['send']
+            user.ratchets[user].recv_key = r['recv']
 
         return user
 
     def writeKeyBundle(self):
         """Write key bundle to encrypted file."""
 
-        kb = KeyBundle.from_user(self).package().encode()
+        #kb = KeyBundle.from_user(self).package().encode()
+        kb = {'ID'       : self.id,
+              'username' : self.username,
+              'IPK'      : self.ipk.private_bytes().hex(),
+              'SPK'      : self.spk.private_bytes().hex(),
+              'signature': self.spk.signature.hex()}
+
+        # Package OPK pairs
+        opkBundle = []
+        for i in range(len(self.opk)):
+            opkBundle.append(self.opk[i].private_bytes().hex())
+        kb['OPK'] = opkBundle
+
+        # Package ratchet states
+        ratchetBundle = {}
+        for user in self.ratchets.keys():
+            ratchetBundle[user] = {'root'   : self.ratchets[user].root_key,
+                                   'send'   : self.ratchets[user].send_key,
+                                   'recv'   : self.ratchets[user].recv_key,
+                                   'AD'     : self.ratchets[user].associated_data,
+                                   'my_id'  : self.ratchets[user].my_id,
+                                   'peer_id': self.ratchets[user].peer_id}
+        kb['ratchets'] = ratchetBundle
+
+        kb_json = json.dumps(kb).encode()
         encryptor = self.cipher.encryptor()
-        enc_kb = encryptor.update(kb) + encryptor.finalize()
+        enc_kb = encryptor.update(kb_json) + encryptor.finalize()
         try:
             with open(f'.cryptomessenger-{self.username}', 'wb') as f:
                 # File will begin with 16-bytes for tag, 32-bytes for nonce
@@ -196,6 +236,8 @@ class User:
         if self.id is None:
             raise Exception('Register with Server first.')
 
+        import code
+        code.interact(local=locals())
         self.ratchets[kb.id] = DoubleRatchet(
             my_id = self.id,
             peer_id = kb.id,
