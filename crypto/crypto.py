@@ -255,18 +255,18 @@ class User:
 
         self.writeKeyBundle()
 
-        return {'username': self.username, \
-                'ipk'     : self.ipk.public_bytes(), \
-                'epk'     : epk.public_bytes(), \
-                'opk'     : kb.opk.public_bytes()}
+        return {'username': self.username,
+                'ipk'     : self.ipk.public_bytes().hex(),
+                'epk'     : epk.public_bytes().hex(),
+                'opk'     : kb.opk.public_bytes().hex()}
 
     def finishHandshake(self, peer_keybundle: str):
         """Calculate the matching shared secret from a users prekey bundle."""
 
         peername = peer_keybundle['username']
-        peer_ipk = IPK.from_public_bytes(peer_keybundle['ipk'])
-        peer_epk = KeyPair.from_public_bytes(peer_keybundle['epk'])
-        used_opk = OPK.from_public_bytes(peer_keybundle['opk'])
+        peer_ipk = IPK.from_public_bytes(bytes.fromhex(peer_keybundle['ipk']))
+        peer_epk = KeyPair.from_public_bytes(bytes.fromhex(peer_keybundle['epk']))
+        used_opk = OPK.from_public_bytes(bytes.fromhex(peer_keybundle['opk']))
 
         opk = None
         for i in range(len(self.opk)):
