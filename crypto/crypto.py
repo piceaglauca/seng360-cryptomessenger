@@ -278,6 +278,22 @@ class User:
                 spk_private = self.spk,
                 opk_private = opk))
 
+    def encrypt(self, peer_id, plaintext):
+        """Encrypt a message with the ratchet associated with peer."""
+
+        ciphertext = self.ratchets[peer_id].encrypt(plaintext)
+        self.writeKeyBundle() # record new state of ratchets
+
+        return ciphertext
+
+    def decrypt(self, peer_id, ciphertext):
+        """Decrypt a message with the ratchet associated with peer."""
+
+        plaintext = self.ratchets[peer_id].decrypt(ciphertext)
+        self.writeKeyBundle() # record new state of ratchets
+
+        return plaintext
+
 
 class DoubleRatchet:
     """Double ratchet encryption
