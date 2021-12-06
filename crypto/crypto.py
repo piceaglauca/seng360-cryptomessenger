@@ -253,6 +253,8 @@ class User:
                 opk_public = kb.opk))
         epk.private = None
 
+        self.writeKeyBundle()
+
         return {'username': self.username, \
                 'ipk'     : self.ipk.public_bytes(), \
                 'epk'     : epk.public_bytes(), \
@@ -282,6 +284,8 @@ class User:
                 ipk_private = self.ipk,
                 spk_private = self.spk,
                 opk_private = opk))
+
+        self.writeKeyBundle()
 
     def encrypt(self, peername, plaintext):
         """Encrypt a message with the ratchet associated with peer."""
