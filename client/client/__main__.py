@@ -11,7 +11,11 @@ import sys
 import time
 
 # Deps
+import requests
 import websockets
+
+# Internal
+from crypto import KeyBundle, User
 
 LOG_FILE = "/var/log/client.log"
 # `logging` module has constants for each log level. Get them based on env var
@@ -21,19 +25,32 @@ logging.basicConfig(filename=LOG_FILE, format=LOG_FORMAT, level=LOG_LEVEL)
 LOGGER = logging.getLogger(__name__)
 
 # Chat endpoint
-URL = "ws://kdc:8000"
+HOST = "kdc"
+PORT = 8000
+
+
+class Registerer:
+    @staticmethod
+    def register(json_str):
+        r = requests.post(
+            f"http://{HOST}:{PORT}/register",
+            data=json_str,
+            # This prevents requests from checking SSL certificate
+            # verify=False
+            )
+
+        return r.text
 
 
 def main():
-    # DEBUG:
-    username = login()
+    user = login()
     friend = input("Who do you want to talk to? ")
-    asyncio.run(chat(username, friend))
+    asyncio.run(chat(user.username, friend))
     
     return 0
 
 
-def login():
+def login() -> User:
     """Handles logging in to server
     
     This includes account creation and authenticate.
@@ -42,44 +59,29 @@ def login():
     new_account = False
 
     while True:
-        try:
-            username = input("Username: ")
+        username = input("Username: ")
 
-            if not username:
-                print("Please enter a username.")
-                continue
-            
-            # TODO: Replace `True` with user check
-            if not True:
-                print("User does not exist.")
-                new_account = input(
-                    "Would you like to create it? (Y/n): ").lower() in ("y", "")
-                
-            while True:
-                password = getpass("New password: " if new_account else "Password: ")
-
-                if not password:
-                    print("Please enter a password.")
-                    continue
-
-                break
-
-            if new_account:
-                # Create account
-                print("Account created.")
-                time.sleep(1)
-            
-            # TODO: Replace `True` with auth request
-            if not True:
-                print("Invalid credentials")
-                continue
-
-            return username
+        if not username:
+            print("Please enter a username.")
+            continue
         
-        except KeyboardInterrupt:
-            print()
-            sys.exit(0)
+        try:
+            user = User.login(username)
+        
+        except Exception:
+            print("User doesn't exist.")
+            create_user = input("Create it? [y/N] ").lower() == "y"
 
+            if create_user:
+                user = User.new(username)
+
+            else:
+                continue
+
+            user.register(Registerer)
+
+        return user
+        
 
 async def chat(username: str, friend: str) -> None:
     """Connects to server and starts the chat
@@ -87,7 +89,7 @@ async def chat(username: str, friend: str) -> None:
     Connects via WebSocket, loops forever.
     """
 
-    async with websockets.connect(f"{URL}/{username}/{friend}") as server:
+    async with websockets.connect(f"ws://{HOST}:{PORT}/{username}/{friend}") as server:
         print(f"Connected as '{username}'. Chatting to {friend}")
         
         # Set up task for listening to server for incoming messages
