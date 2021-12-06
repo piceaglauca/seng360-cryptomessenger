@@ -126,9 +126,9 @@ async def server_handler(server, user: User, friend: str) -> None:
             await server.send_json(True)
 
         else:
-            #plaintext = user.decrypt(friend, message)
-            print(f"{sender}: {message}")
-            #print(f"{sender}: {plaintext}")
+            plaintext = user.decrypt(friend, message)
+            #print(f"{sender}: {message}")
+            print(f"{sender}: {plaintext}")
 
 
 def start_handshake(user: User, friend: str):
