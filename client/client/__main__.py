@@ -96,7 +96,7 @@ async def chat(user: User, friend: str) -> None:
 
         # Set up task for handling input from user
         input_task = asyncio.ensure_future(
-            input_handler(server, user))
+            input_handler(server, user, friend))
 
         # Wait for both tasks to finish (note: both tasks run forever)
         _, pending = await asyncio.wait(
@@ -126,7 +126,9 @@ async def server_handler(server, user: User, friend: str) -> None:
             await server.send_json(True)
 
         else:
+            #plaintext = user.decrypt(friend, message)
             print(f"{sender}: {message}")
+            #print(f"{sender}: {plaintext}")
 
 
 def start_handshake(user: User, friend: str):
@@ -134,7 +136,7 @@ def start_handshake(user: User, friend: str):
     return user.startHandshake(r.json())
 
 
-async def input_handler(server, user: User) -> None:
+async def input_handler(server, user: User, friend: str) -> None:
     """Waits for user input and sends messages to server"""
 
     # encryptor = user.cipher.encryptor()
@@ -145,8 +147,9 @@ async def input_handler(server, user: User) -> None:
         # encoded_message = message.encode()
         # encrypted_message = enc_kb = encryptor.update(encoded_message) + encryptor.finalize()
         # Send message to server
-        await server.send_json(message)
-        # await server.send(encrypted_message)
+        #await server.send_json(message)
+        encrypted_message = user.encrypt(friend, message)
+        await server.send(encrypted_message)
 
 
 async def async_input(prompt: str = "") -> str:
@@ -162,4 +165,3 @@ async def async_input(prompt: str = "") -> str:
 
 if __name__ == "__main__":
     main()
-    
