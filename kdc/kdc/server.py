@@ -1,11 +1,11 @@
 import os
 
 from crypto import KeyBundle
-from dblib import KDCDBCursor
+from kdc.dblib import KDCDBCursor
 
-DB_DIR = '../data'
+DB_DIR = '/code/kdc/data'
 DB_PATH = f'{DB_DIR}/kdc.db'
-SCRIPT_DIR = '../scripts'
+SCRIPT_DIR = '/code/kdc/scripts'
 
 
 class Server:
