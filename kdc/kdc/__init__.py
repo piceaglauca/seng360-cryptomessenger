@@ -3,9 +3,13 @@
 # Standard lib
 import logging
 import os
+from typing import Any
 
 # Deps
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Request, WebSocket
+
+# Internal modules
+from kdc.server import Server
 
 # `logging` module has constants for each log level. Get them based on env var
 LOG_LEVEL = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper())
@@ -42,3 +46,10 @@ async def chat(connection: WebSocket, me: str, friend: str):
 
         # Send a JSON string of tuple of sender and received message..
         await USERS[friend].send_text(f"{me}: {message}")
+
+
+@APP.post("/register")
+def register(request: Request):
+    server = Server()
+    uuid = server.register(request.body())
+    return uuid
