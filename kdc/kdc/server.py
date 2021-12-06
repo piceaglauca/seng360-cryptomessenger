@@ -3,9 +3,7 @@ import os
 from crypto import KeyBundle
 from kdc.dblib import KDCDBCursor
 
-DB_DIR = '/code/kdc/data'
-DB_PATH = f'{DB_DIR}/kdc.db'
-SCRIPT_DIR = '/code/kdc/scripts'
+DB_PATH = '/var/lib/kdc.db'
 
 
 class Server:
@@ -15,8 +13,6 @@ class Server:
     a secret conversation with a user."""
 
     def __init__(self):
-        if not os.path.exists(DB_PATH):
-            os.system(f'python3 {SCRIPT_DIR}/kdc-db-init.py {DB_DIR}/kdc-schema.sql')
         self.kdc_db = KDCDBCursor(DB_PATH)
 
     def register(self, keybundle: str) -> str:
