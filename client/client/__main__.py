@@ -125,6 +125,8 @@ async def server_handler(server, user: User, friend: str) -> None:
             user.finishHandshake()
             await server.send_json(True)
 
+        elif sender == "INFO":
+            print(f"{sender}: {message}")
         else:
             plaintext = user.decrypt(friend, message)
             #print(f"{sender}: {message}")
