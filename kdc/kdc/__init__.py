@@ -3,10 +3,10 @@
 # Standard lib
 import logging
 import os
-from typing import Any
+import sys
 
 # Deps
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 
 # Internal modules
 from kdc.server import Server
@@ -24,32 +24,66 @@ APP = FastAPI()
 USERS = {}
 
 
-@APP.websocket("/{me}/{friend}")
-async def chat(connection: WebSocket, me: str, friend: str):
+@APP.websocket("/{username}/{friend_username}")
+async def chat(user: WebSocket, username: str, friend_username: str):
     """WebSocket endpoint for handling chat messages"""
 
     # Wait for user to accept connection
-    await connection.accept()
+    await user.accept()
     
-    # Add user to set of connected users
-    USERS[me] = connection
+    try:    
+        # Add user to set of connected users
+        USERS[username] = user
 
-    if friend in USERS:
-        await USERS[friend].send_text(f"INFO: {me} has joined the chat.")
+        friend = await connect_users(user, friend_username)
 
-    else:
-        await USERS[me].send_text(f"INFO: {friend} not yet online.")
+        while True:
+            # Wait for a message from this user
+            message = await user.receive_json()
 
-    while True:
-        # Wait for a message from this user
-        message = await USERS[me].receive_text()
-
-        # Send a JSON string of tuple of sender and received message..
-        await USERS[friend].send_text(f"{me}: {message}")
+            # Send a JSON string of tuple of sender and received message..
+            await friend.send_json((username, message))
+    
+    except WebSocketDisconnect:
+        del USERS[username]
 
 
 @APP.post("/register")
-def register(request: Request):
-    server = Server()
-    uuid = server.register(request.body())
+async def register(request: Request):
+    uuid = Server().register(await request.body())
     return uuid
+
+
+@APP.get("/key-bundle/{username}")
+async def key_bundle(username: str):
+    key_bundle = Server().getKeyBundle(username)
+    return key_bundle
+
+
+async def connect_users(user, friend_username: str):
+    # I.e., second member of chat connected
+    if friend_username in USERS:
+        # Tell client to start handshake
+        await user.send_json(("start_handshake", None))
+        print("sent start hs req")
+        # Client starts handshake, and sends keys back to server
+        handshake_keys = await user.receive_json()
+        friend = USERS[friend_username]
+        # Send keys to friend and instruct to finish handshake
+        await friend.send_json(("finish_handshake", handshake_keys))
+        # Inform waiting user
+        await friend.send_json((
+            "INFO", f"'{friend_username}' has joined the chat."))
+
+    # # I.e., first member of chat connected
+    else:
+        # Inform just logged on user that their friend has not yet logged on
+        await user.send_json((
+            "INFO", f"'{friend_username}' is not yet online."))
+        # Wait for handshake to finish
+        handshake_done = await user.receive_json()
+        # If handshake failed
+        if not handshake_done:
+            sys.exit(1)
+    
+    return friend

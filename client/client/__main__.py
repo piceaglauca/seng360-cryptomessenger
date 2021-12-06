@@ -34,10 +34,7 @@ class Registerer:
     def register(json_str):
         r = requests.post(
             f"http://{HOST}:{PORT}/register",
-            data=json_str,
-            # This prevents requests from checking SSL certificate
-            # verify=False
-            )
+            data=json_str)
 
         return r.text
 
@@ -45,7 +42,8 @@ class Registerer:
 def main():
     user = login()
     friend = input("Who do you want to talk to? ")
-    asyncio.run(chat(user.username, friend))
+
+    asyncio.run(chat(user, friend))
     
     return 0
 
@@ -83,22 +81,22 @@ def login() -> User:
         return user
         
 
-async def chat(username: str, friend: str) -> None:
+async def chat(user: User, friend: str) -> None:
     """Connects to server and starts the chat
     
     Connects via WebSocket, loops forever.
     """
 
-    async with websockets.connect(f"ws://{HOST}:{PORT}/{username}/{friend}") as server:
-        print(f"Connected as '{username}'. Chatting to {friend}")
+    async with websockets.connect(f"ws://{HOST}:{PORT}/{user.username}/{friend}") as server:
+        print(f"Connected as '{user.username}'. Chatting to '{friend}'")
         
         # Set up task for listening to server for incoming messages
         server_task = asyncio.ensure_future(
-            server_handler(server))
+            server_handler(server, user, friend))
 
         # Set up task for handling input from user
         input_task = asyncio.ensure_future(
-            input_handler(server))
+            input_handler(server, user))
 
         # Wait for both tasks to finish (note: both tasks run forever)
         _, pending = await asyncio.wait(
@@ -110,22 +108,45 @@ async def chat(username: str, friend: str) -> None:
             task.cancel()
 
 
-async def server_handler(server) -> None:
+async def server_handler(server, user: User, friend: str) -> None:
     """Handles incoming messages from server"""
 
+    # decryptor = user.cipher.decryptor()
+
     # For each new message received from server
-    async for message in server:
-        print(message)
+    async for data in server:
+        sender, message = json.loads(data)
+
+        if sender == "start_handshake":
+            handshake_keys = start_handshake(user, friend)
+            await server.send_json(handshake_keys)
+
+        elif sender == "finish_handshake":
+            user.finishHandshake()
+            await server.send_json(True)
+
+        else:
+            print(f"{sender}: {message}")
 
 
-async def input_handler(server) -> None:
+def start_handshake(user: User, friend: str):
+    r = requests.get(f"http://{HOST}:{PORT}/key-bundle/{friend}")
+    return user.startHandshake(r.json())
+
+
+async def input_handler(server, user: User) -> None:
     """Waits for user input and sends messages to server"""
+
+    # encryptor = user.cipher.encryptor()
 
     while True:
         # Prompt user for message
         message = await async_input()
+        # encoded_message = message.encode()
+        # encrypted_message = enc_kb = encryptor.update(encoded_message) + encryptor.finalize()
         # Send message to server
-        await server.send(message)
+        await server.send_json(message)
+        # await server.send(encrypted_message)
 
 
 async def async_input(prompt: str = "") -> str:
