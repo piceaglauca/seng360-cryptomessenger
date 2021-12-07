@@ -88,7 +88,7 @@ async def connect_users(user, friend_username: str):
         #handshake_done = await user.receive_json()
         handshake_done = await user.receive()
         # If handshake failed
-        if handshake_done != "True":
+        if handshake_done['text'] != "True":
             sys.exit(1)
     
     return friend
