@@ -90,5 +90,6 @@ async def connect_users(user, friend_username: str):
         # If handshake failed
         if handshake_done['text'] != "True":
             sys.exit(1)
+        friend = await connect_users(user, friend_username)
     
     return friend
