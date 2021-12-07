@@ -30,7 +30,7 @@ class ClientDBCursor:
 
     def getMessageHistory(self, peer):
         self.cur.execute(
-            'SELECT message.body, message.timestamp FROM conversation JOIN message ON conversation.id = message.conversation_id WHERE conversation.peer = ?', [peer]
+            'SELECT message.body, message.tag, message.timestamp FROM conversation JOIN message ON conversation.id = message.conversation_id WHERE conversation.peer = ?', [peer]
         )
         self.con.commit()
         return self.cur.fetchall()
@@ -58,7 +58,7 @@ class ClientDBCursor:
         self.con.commit()
         return self.cur.fetchall()        
 
-    def addMessage(self, message, peer):
+    def addMessage(self, message, tag, peer):
         # Get conversation id for specified peer.
         conversation_id = None
         try:
@@ -69,7 +69,7 @@ class ClientDBCursor:
             
         id = str(uuid.uuid4()) # Create random UUID.
         self.cur.execute(
-            'INSERT INTO message VALUES (?, ?, ?, DATETIME(\'now\'))', (id, conversation_id, message)
+            'INSERT INTO message VALUES (?, ?, ?, ?, DATETIME(\'now\'))', (id, conversation_id, message, tag)
         )
         self.con.commit()
 

@@ -16,6 +16,7 @@ import websockets
 
 # Internal
 from crypto import KeyBundle, User
+from client.dblib import ClientDBCursor
 
 LOG_FILE = "/var/log/client.log"
 # `logging` module has constants for each log level. Get them based on env var
@@ -27,6 +28,8 @@ LOGGER = logging.getLogger(__name__)
 # Chat endpoint
 HOST = "kdc"
 PORT = 8000
+
+client_db = ClientDBCursor('/var/lib/client.db')
 
 
 class Registerer:
@@ -89,6 +92,8 @@ async def chat(user: User, friend: str) -> None:
 
     async with websockets.connect(f"ws://{HOST}:{PORT}/{user.username}/{friend}") as server:
         print(f"Connected as '{user.username}'. Chatting to '{friend}'")
+
+        client_db.addConversation(friend)
         
         # Set up task for listening to server for incoming messages
         server_task = asyncio.ensure_future(
@@ -140,6 +145,8 @@ async def server_handler(server, user: User, friend: str) -> None:
 
                 if 'ciphertext' in message_json.keys():
                     plaintext = user.decrypt(friend, message_json)
+                    ciphertext, tag = user.pw_encrypt(plaintext.encode())
+                    client_db.addMessage(ciphertext.hex(), tag.hex(), friend)
                     print(f"{sender}: {plaintext}")
 
 

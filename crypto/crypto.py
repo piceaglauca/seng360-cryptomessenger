@@ -149,11 +149,10 @@ class User:
             raise Exception('Login error')
 
 
+        cipher = Cipher(algorithms.AES(kdf(nonce + password)),
+                        modes.GCM(nonce))
         try:
-            cipher = Cipher(algorithms.AES(kdf(nonce + password)),
-                            modes.GCM(nonce))
-            decryptor = cipher.decryptor()
-            dec_kb = decryptor.update(enc_kb) + decryptor.finalize_with_tag(tag)
+            dec_kb = pw_decrypt(enc_kb, tag)
         except InvalidTag:
             raise Exception('Login error: invalid tag') # TODO remove reason
 
@@ -217,12 +216,11 @@ class User:
         kb['ratchets'] = ratchetBundle
 
         kb_json = json.dumps(kb).encode()
-        encryptor = self.cipher.encryptor()
-        enc_kb = encryptor.update(kb_json) + encryptor.finalize()
+        enc_kb, tag = self.pw_encrypt(kb_json)
         try:
             with open(f'.cryptomessenger-{self.username}', 'wb') as f:
                 # File will begin with 16-bytes for tag, 32-bytes for nonce
-                f.write(encryptor.tag + self.nonce + enc_kb)
+                f.write(tag + self.nonce + enc_kb)
         except:
             raise
 
@@ -301,6 +299,16 @@ class User:
         plaintext = self.ratchets[peername].decrypt(ciphertext)
         self.writeKeyBundle() # record new state of ratchets
 
+        return plaintext
+
+    def pw_encrypt(self, plaintext):
+        encryptor = self.cipher.encryptor()
+        ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+        return (ciphertext, encryptor.tag)
+
+    def pw_decrypt(self, ciphertext, tag):
+        decryptor = self.cipher.decryptor()
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize_with_tag(tag)
         return plaintext
 
 
