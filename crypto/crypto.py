@@ -360,14 +360,16 @@ class DoubleRatchet:
         """Encrypt a message and ratchet the send key."""
 
         self.updateEncryptor()
+        ciphertext = self.encryptor.update(message.encode()) + self.encryptor.finalize()
 
-        return (self.encryptor.update(message.encode()) + self.encryptor.finalize(), self.encryptor.tag)
+        return {'ciphertext': ciphertext.hex(),
+                'tag'       : self.encryptor.tag.hex()}
 
     def decrypt(self, tagged_message):
         """Decrypt a message and ratchet the receive key."""
 
-        message = tagged_message[0]
-        tag = tagged_message[1]
+        message = bytes.fromhex(tagged_message['ciphertext'])
+        tag = bytes.fromhex(tagged_message['tag'])
 
         self.updateDecryptor()
 
