@@ -111,28 +111,36 @@ async def chat(user: User, friend: str) -> None:
 async def server_handler(server, user: User, friend: str) -> None:
     """Handles incoming messages from server"""
 
-    # decryptor = user.cipher.decryptor()
-
     # For each new message received from server
     async for data in server:
         sender, message = json.loads(data)
 
         if sender == "start_handshake":
             handshake_keys = start_handshake(user, friend)
-            #await server.send_json(handshake_keys)
             await server.send(json.dumps(handshake_keys))
 
         elif sender == "finish_handshake":
             user.finishHandshake(json.loads(message['text']))
-            #await server.send_json(True)
             await server.send("True")
 
         elif sender == "INFO":
             print(f"{sender}: {message}")
         else:
-            plaintext = user.decrypt(friend, message)
-            #print(f"{sender}: {message}")
-            print(f"{sender}: {plaintext}")
+            # HTTP messages don't have 'text' key in JSON
+            if 'text' in message.keys():
+                # TODO: some messages were coming through here that were not
+                # messages between Alice and Bob. The correct ones will be
+                # JSON strings with 'ciphertext' and 'tag' as keys.
+                # Some of the invalid ones are plain strings, which will
+                # cause json.loads() to throw JSONDecodeError
+                try:
+                    message_json = json.loads(message['text'])
+                except JSONDecodeError:
+                    message_json = {} # TODO do this properly
+
+                if 'ciphertext' in message_json.keys():
+                    plaintext = user.decrypt(friend, message_json)
+                    print(f"{sender}: {plaintext}")
 
 
 def start_handshake(user: User, friend: str):
@@ -143,16 +151,14 @@ def start_handshake(user: User, friend: str):
 async def input_handler(server, user: User, friend: str) -> None:
     """Waits for user input and sends messages to server"""
 
-    # encryptor = user.cipher.encryptor()
-
     while True:
         # Prompt user for message
         message = await async_input()
-        # encoded_message = message.encode()
-        # encrypted_message = enc_kb = encryptor.update(encoded_message) + encryptor.finalize()
+
+        # Encrypt message
+        encrypted_message = json.dumps(user.encrypt(friend, message))
+
         # Send message to server
-        #await server.send_json(message)
-        encrypted_message = user.encrypt(friend, message)
         await server.send(encrypted_message)
 
 
