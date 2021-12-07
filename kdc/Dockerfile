@@ -6,7 +6,8 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Set up Python
 RUN apt-get update && apt-get install -y \
     python3.9 \
-    python3-pip
+    python3-pip \
+    sqlite3
 
 WORKDIR /code/kdc
 
