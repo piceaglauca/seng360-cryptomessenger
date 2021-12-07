@@ -119,11 +119,13 @@ async def server_handler(server, user: User, friend: str) -> None:
 
         if sender == "start_handshake":
             handshake_keys = start_handshake(user, friend)
-            await server.send_json(handshake_keys)
+            #await server.send_json(handshake_keys)
+            await server.send(json.dumps(handshake_keys))
 
         elif sender == "finish_handshake":
-            user.finishHandshake()
-            await server.send_json(True)
+            user.finishHandshake(message['text'])
+            #await server.send_json(True)
+            await server.send(True)
 
         elif sender == "INFO":
             print(f"{sender}: {message}")
