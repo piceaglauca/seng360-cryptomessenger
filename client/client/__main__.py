@@ -123,9 +123,9 @@ async def server_handler(server, user: User, friend: str) -> None:
             await server.send(json.dumps(handshake_keys))
 
         elif sender == "finish_handshake":
-            user.finishHandshake(message['text'])
+            user.finishHandshake(json.loads(message['text']))
             #await server.send_json(True)
-            await server.send(True)
+            await server.send("True")
 
         elif sender == "INFO":
             print(f"{sender}: {message}")
