@@ -135,7 +135,7 @@ async def server_handler(server, user: User, friend: str) -> None:
                 # cause json.loads() to throw JSONDecodeError
                 try:
                     message_json = json.loads(message['text'])
-                except JSONDecodeError:
+                except json.decoder.JSONDecodeError:
                     message_json = {} # TODO do this properly
 
                 if 'ciphertext' in message_json.keys():
